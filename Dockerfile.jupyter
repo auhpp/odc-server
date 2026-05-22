@@ -1,0 +1,25 @@
+FROM python:3.12-slim
+
+# 1. Cài đặt các thư viện lõi của hệ điều hành (Bắt buộc cho dữ liệu không gian và Database)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gdal-bin \
+    libgdal-dev \
+    libpq-dev \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV GDAL_CONFIG=/usr/bin/gdal-config
+
+# 2. Cài đặt Jupyter kết hợp với Open Data Cube
+RUN pip3 install --no-cache-dir \
+    datacube==1.9.18 \
+    psycopg2-binary \
+    odc-geo \
+    odc-stac \
+    jupyterlab \
+    ipykernel \
+    matplotlib
+
+WORKDIR /home/jovyan/work
+EXPOSE 8888

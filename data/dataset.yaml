@@ -1,0 +1,44 @@
+$schema: "https://schemas.opendatacube.org/dataset"
+id: 12224164-9b2f-412f-90e6-0158ed058d99
+
+product:
+  name: dummy_eo_product
+
+# 1. Khai báo không gian (Thay cho grid_spatial và extent cũ)
+crs: "epsg:32648"
+geometry:
+  type: Polygon
+  coordinates:
+    [
+      [
+        [500000, 1200000], # 1. Góc trên trái
+        [500000, 1100000], # 2. Kéo xuống góc dưới trái
+        [600000, 1100000], # 3. Kéo sang góc dưới phải
+        [600000, 1200000], # 4. Kéo lên góc trên phải
+        [500000, 1200000], # 5. Trở về điểm bắt đầu
+      ],
+    ]
+
+# Khai báo lưới pixel (Giả định ảnh 1000x1000 pixel, độ phân giải 100m dựa trên tọa độ của bạn)
+grids:
+  default:
+    shape: [1000, 1000]
+    transform: [100, 0, 500000, 0, -100, 1200000, 0, 0, 1]
+
+# 2. Khai báo thông tin siêu dữ liệu (Chuẩn hóa theo STAC)
+properties:
+  datetime: "2026-05-21T00:00:00Z"
+  odc:processing_datetime: "2026-05-21T00:00:00Z"
+  eo:platform: "DUMMY_SATELLITE"
+  eo:instrument: "DUMMY_SENSOR"
+
+# 3. Liên kết file thực tế (Thay cho khối image/bands cũ)
+measurements:
+  red:
+    path: "dummy_red.tif"
+  green:
+    path: "dummy_green.tif"
+  blue:
+    path: "dummy_blue.tif"
+
+lineage: {}

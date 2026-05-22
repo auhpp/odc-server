@@ -1,0 +1,11 @@
+# Bỏ qua mã nguồn bên thứ 3
+datacube-explorer/
+
+# Bỏ qua các file rác của hệ thống và Jupyter Notebook
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Ignore environment variables
+.env
