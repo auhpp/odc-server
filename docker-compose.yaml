@@ -17,6 +17,17 @@ x-odc-env: &odc-env
   DB_USERNAME: ${DB_USER}
   DB_PASSWORD: ${DB_PASSWORD}
 
+  # Bổ sung cấu hình giao tiếp S3 cho MinIO
+  AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+  AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+  AWS_S3_ENDPOINT: minio:9000
+  AWS_DEFAULT_REGION: local
+
+  # Cấu hình để GDAL bỏ qua SSL (vì MinIO chạy nội bộ)
+  AWS_HTTPS: "NO"
+  AWS_VIRTUAL_HOSTING: "FALSE"
+  GDAL_HTTP_UNSAFESSL: "YES"
+
 x-explorer-build: &explorer-build
   context: ./datacube-explorer
   args:
@@ -189,6 +200,42 @@ services:
       - pgadmin_data:/var/lib/pgadmin
     networks:
       - odc_net
+  
+  minio:
+    image: minio/minio:latest
+    container_name: odc_minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000" # Cổng API nội bộ cho ODC đọc pixel
+      - "9001:9001" # Cổng giao diện Web (Console) cho bạn thao tác
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - odc_net
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: odc_minio_init
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_DEFAULT_BUCKET: ${MINIO_DEFAULT_BUCKET}
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set local_minio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+      mc mb local_minio/${MINIO_DEFAULT_BUCKET} --ignore-existing;
+      mc anonymous set public local_minio/${MINIO_DEFAULT_BUCKET};
+      exit 0;
+      "
+    networks:
+      - odc_net
 
 networks:
   odc_net:
@@ -197,3 +244,4 @@ networks:
 volumes:
   postgres_data:
   pgadmin_data:
+  minio_data:

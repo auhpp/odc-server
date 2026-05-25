@@ -1,0 +1,116 @@
+name: s2_l2a_cantho
+description: Định nghĩa sản phẩm ảnh vệ tinh Sentinel-2 Level-2A (Độ phản xạ đáy khí quyển - Bottom of Atmosphere Reflectance) cho khu vực Cần Thơ, tích hợp đường ống tự động dữ liệu từ Copernicus Space Ecosystem.
+metadata_type: eo3
+
+# --------------------------------------------------------------------
+# Thuộc tính siêu dữ liệu chung (Metadata Search Fields)
+# --------------------------------------------------------------------
+metadata:
+  product:
+    name: s2_l2a_cantho
+  properties:
+    eo:platform: sentinel-2
+    eo:instrument: msi
+    odc:processing_level: l2a
+
+# --------------------------------------------------------------------
+# Danh sách cấu trúc các dải băng phổ (Measurements / Bands Definition)
+# --------------------------------------------------------------------
+measurements:
+  # ================= 10m Resolution Bands =================
+  - name: blue
+    aliases: [band_2, b02, b2]
+    dtype: uint16
+    nodata: 0
+    units: '1'
+
+  - name: green
+    aliases: [band_3, b03, b3]
+    dtype: uint16
+    nodata: 0
+    units: '1'
+
+  - name: red
+    aliases: [band_4, b04, b4]
+    dtype: uint16
+    nodata: 0
+    units: '1'
+
+  - name: nir
+    aliases: [band_8, b08, b8]
+    dtype: uint16
+    nodata: 0
+    units: '1'
+
+  # ================= 20m Resolution Bands =================
+  - name: red_edge_1
+    aliases: [band_5, b05, b5]
+    dtype: uint16
+    nodata: 0
+    units: '1'
+
+  - name: red_edge_2
+    aliases: [band_6, b06, b6]
+    dtype: uint16
+    nodata: 0
+    units: '1'
+
+  - name: red_edge_3
+    aliases: [band_7, b07, b7]
+    dtype: uint16
+    nodata: 0
+    units: '1'
+
+  - name: nir_narrow
+    aliases: [band_8a, b08a, b8a, nir08]
+    dtype: uint16
+    nodata: 0
+    units: '1'
+
+  - name: swir_1
+    aliases: [band_11, b11, swir16]
+    dtype: uint16
+    nodata: 0
+    units: '1'
+
+  - name: swir_2
+    aliases: [band_12, b12, swir22]
+    dtype: uint16
+    nodata: 0
+    units: '1'
+
+  # ================= 60m Resolution Bands =================
+  - name: coastal_aerosol
+    aliases: [band_1, b01, b1]
+    dtype: uint16
+    nodata: 0
+    units: '1'
+
+  - name: water_vapour
+    aliases: [band_9, b09, b9]
+    dtype: uint16
+    nodata: 0
+    units: '1'
+
+  # ================= Auxiliary & Classification Bands =================
+  # Dải phân loại mây và thảm phủ (Scene Classification Layer)
+  # Giá trị từ 0-11 (ví dụ: 3=Bóng mây, 4=Thực vật, 8=Mây dày, 9=Mây mỏng)
+  - name: SCL
+    aliases: [scl, scene_classification, mask]
+    dtype: uint8
+    nodata: 0
+    units: '1'
+
+  # Aerosol Optical Thickness - Độ dày quang học sol khí
+  - name: AOT
+    aliases: [aot, aerosol_optical_thickness]
+    dtype: uint16
+    nodata: 0
+    units: '1'
+
+  # Water Vapour (từ thuật toán Sen2Cor)
+  - name: WVP
+    aliases: [wvp, scene_average_water_vapour]
+    dtype: uint16
+    nodata: 0
+    units: '1'
