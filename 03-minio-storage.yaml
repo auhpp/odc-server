@@ -1,0 +1,114 @@
+# 1. Ổ cứng cho MinIO
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-pvc
+  namespace: odc-system
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# 2. MinIO Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: odc-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:latest
+          args: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - containerPort: 9000
+            - containerPort: 9001
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: MINIO_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: MINIO_PASSWORD
+          volumeMounts:
+            - name: minio-data
+              mountPath: /data
+      volumes:
+        - name: minio-data
+          persistentVolumeClaim:
+            claimName: minio-pvc
+
+---
+# 3. Service nội bộ cho MinIO
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-svc
+  namespace: odc-system
+spec:
+  type: LoadBalancer
+  selector:
+    app: minio
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
+
+---
+# 4. Job cấu hình Bucket (Thay thế cho minio-init trong Compose)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-init-job
+  namespace: odc-system
+spec:
+  template:
+    spec:
+      containers:
+        - name: minio-init
+          image: minio/mc:latest
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: MINIO_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: MINIO_PASSWORD
+            - name: MINIO_DEFAULT_BUCKET
+              value: "odc-bucket"
+          command: ["/bin/sh", "-c"]
+          # Dùng curl để kiểm tra MinIO API mở chưa, rồi mới chạy lệnh mc
+          args:
+            - >
+              echo "Waiting for MinIO...";
+              while ! mc alias set local_minio http://minio-svc:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; do 
+                echo "MinIO not ready yet, retrying in 2s...";
+                sleep 2; 
+              done;
+              echo "MinIO is ready! Configuring buckets...";
+              mc mb local_minio/${MINIO_DEFAULT_BUCKET} --ignore-existing;
+              mc anonymous set public local_minio/${MINIO_DEFAULT_BUCKET};
+              echo "MinIO initialization complete!";
+      restartPolicy: OnFailure

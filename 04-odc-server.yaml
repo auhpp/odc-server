@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: odc-server
+  namespace: odc-system
+spec:
+  replicas: 1 # Đóng vai trò máy trạm, 1 replica là đủ để thao tác
+  selector:
+    matchLabels:
+      app: odc-server
+  template:
+    metadata:
+      labels:
+        app: odc-server
+    spec:
+      containers:
+        - name: odc-server
+          image: aub2205926/my-custom-odc:1.9.18 # Thay bằng image nội bộ của bạn nếu có
+          imagePullPolicy: IfNotPresent
+          command: ["bash", "-lc", "tail -f /dev/null"] # Giữ cho container luôn chạy
+          env:
+            # 1. Cấu hình kết nối Cơ sở dữ liệu (Postgres)
+            - name: ODC_DEFAULT_INDEX_DRIVER
+              value: "postgis"
+            - name: DB_HOSTNAME
+              value: "postgres-svc" # Gọi thẳng tên Service nội bộ
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_DATABASE
+              value: "opendatacube"
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: DB_PASSWORD
+
+            # 2. Cấu hình kết nối Object Storage (MinIO)
+            - name: AWS_S3_ENDPOINT
+              value: "http://minio-svc:9000" # Gọi cổng API 9000 của MinIO
+            - name: AWS_DEFAULT_REGION
+              value: "local"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: MINIO_USER
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: MINIO_PASSWORD
+
+            # 3. Cấu hình tắt SSL cho mạng nội bộ K8s
+            - name: AWS_HTTPS
+              value: "NO"
+            - name: AWS_VIRTUAL_HOSTING
+              value: "FALSE"
+            - name: GDAL_HTTP_UNSAFESSL
+              value: "YES"

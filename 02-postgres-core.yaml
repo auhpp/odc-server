@@ -1,0 +1,112 @@
+# 1. Ổ cứng cho Postgres
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: odc-system
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 4Gi
+
+---
+# 2. Database Server (Postgres + PostGIS)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: odc-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgis/postgis:16-3.4
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "opendatacube"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: DB_PASSWORD
+          volumeMounts:
+            - name: pg-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: pg-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+
+---
+# 3. Service nội bộ cho Postgres
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-svc
+  namespace: odc-system
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+
+---
+# 4. Job khởi tạo Database (Thay thế cho odc-init trong Compose)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: odc-init-job
+  namespace: odc-system
+spec:
+  template:
+    spec:
+      containers:
+        - name: odc-init
+          image: aub2205926/my-custom-odc:1.9.18 # Thay bằng image nội bộ của bạn nếu có
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_HOSTNAME
+              value: "postgres-svc"
+            - name: DB_DATABASE
+              value: "opendatacube"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: DB_PASSWORD
+          command: ["bash", "-lc"]
+          # Vòng lặp chờ Postgres khởi động xong mới chạy lệnh init
+          args:
+            - >
+              echo "Waiting for PostgreSQL...";
+              while ! < /dev/tcp/postgres-svc/5432; do 
+                echo "Postgres not ready yet, retrying in 2s...";
+                sleep 2; 
+              done;
+              echo "PostgreSQL is ready! Running datacube init...";
+              datacube -v system init && datacube system check;
+      restartPolicy: OnFailure # Nếu lỗi (DB chưa lên kịp), K8s sẽ tự chạy lại Job này
