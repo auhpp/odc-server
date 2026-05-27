@@ -32,7 +32,68 @@ docker compose build
 
 ---
 
-# 3. Khởi động Containers
+# 3. Kustomize - Triển khai Kubernetes
+
+Dự án đã được tổ chức thành cấu trúc `base` và overlay `dev`:
+
+- `kustomize/base`: manifest chung (bao gồm Namespace, Secrets, Services, Deployments, Jobs, Ingress)
+- `kustomize/overlays/dev`: cấu hình dev
+
+Áp dụng overlay dev bằng lệnh:
+
+```bash
+kubectl apply -k .
+```
+
+Hoặc chạy trực tiếp overlay dev:
+
+```bash
+kubectl apply -k kustomize/overlays/dev
+```
+
+Tạo namespace bằng file YAML:
+
+```bash
+kubectl apply -f kustomize/base/namespace.yaml
+```
+
+Hoặc để Kustomize tự tạo namespace khi apply toàn bộ dev overlay:
+
+```bash
+kubectl apply -k kustomize/overlays/dev
+```
+
+Xem manifest dev:
+
+```bash
+kubectl kustomize kustomize/overlays/dev
+```
+
+## Ingress
+
+Dự án bao gồm Ingress để expose các service qua hostname:
+
+- **explorer.odc-server.local**: Datacube Explorer (port 8000)
+- **jupyter.odc-server.local**: Jupyter Notebook (port 8888)
+- **minio.odc-server.local**: MinIO Dashboard (port 9001)
+
+Yêu cầu NGINX Ingress Controller. Để cài đặt:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
+```
+
+Sau đó cập nhật file hosts để resolve hostname:
+
+```
+127.0.0.1 explorer.odc-server.local
+127.0.0.1 jupyter.odc-server.local
+127.0.0.1 minio.odc-server.local
+```
+
+---
+
+# 4. Khởi động Containers
 
 Khởi chạy toàn bộ container ở chế độ nền (`detached mode`).
 

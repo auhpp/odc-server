@@ -82,6 +82,8 @@ spec:
           image: aub2205926/my-custom-odc:1.9.18 # Thay bằng image nội bộ của bạn nếu có
           imagePullPolicy: IfNotPresent
           env:
+            - name: ODC_DEFAULT_INDEX_DRIVER
+              value: "postgis"
             - name: DB_HOSTNAME
               value: "postgres-svc"
             - name: DB_DATABASE

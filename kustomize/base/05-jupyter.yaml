@@ -87,15 +87,14 @@ spec:
             claimName: jupyter-workspace-pvc
 
 ---
-# 3. Service (Mở cổng ra ngoài để bạn dùng trình duyệt truy cập)
+# 3. Service nội bộ cho Jupyter
 apiVersion: v1
 kind: Service
 metadata:
   name: jupyter-svc
   namespace: odc-system
 spec:
-  # Nếu dùng Docker Desktop, LoadBalancer sẽ tự động map ra localhost của máy bạn
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: jupyter
   ports:

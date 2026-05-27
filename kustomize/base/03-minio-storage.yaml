@@ -61,7 +61,7 @@ metadata:
   name: minio-svc
   namespace: odc-system
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: minio
   ports:

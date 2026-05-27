@@ -1,0 +1,43 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: odc-ingress
+  namespace: odc-system
+spec:
+  ingressClassName: nginx
+  rules:
+    # 1. ODC Explorer (Datacube Explorer Web UI)
+    - host: explorer.odc-server.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: odc-explorer-svc
+                port:
+                  number: 8000
+
+    # 2. Jupyter Notebook
+    - host: jupyter.odc-server.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jupyter-svc
+                port:
+                  number: 8888
+
+    # 3. MinIO Dashboard
+    - host: minio.odc-server.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: minio-svc
+                port:
+                  number: 9001
