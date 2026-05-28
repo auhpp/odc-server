@@ -207,51 +207,48 @@ kubectl apply -k kustomize/overlays/dev
 ---
 
 ## Quản lý Dữ liệu
-
 ### 1. Nạp Product (Indexing)
 
-Trước khi nạp Product, bạn cần chuyển file định nghĩa (YAML) từ máy tính local vào bên trong Pod của ODC Server.
+Trước khi nạp Product, bạn cần chuyển file định nghĩa (YAML) nằm trong thư mục `data` từ máy tính local vào bên trong Pod của ODC Server.
 
-**Bước 1:** Copy file từ local vào thư mục `/tmp` của Pod:
+Hãy chọn một trong hai cách dưới đây tùy thuộc vào hệ điều hành/terminal bạn đang sử dụng:
 
-```bash
-# Lấy tên pod ODC Server hiện tại
-POD_NAME=$(kubectl get pods -n odc-system -l app=odc-server -o jsonpath='{.items[0].metadata.name}')
+#### Dành cho Windows (Sử dụng PowerShell)
+Chạy lần lượt các lệnh sau:
 
-# Copy file vào pod
-kubectl cp ./sentinel2_product.yaml odc-system/$POD_NAME:/tmp/sentinel2_product.yaml
+```powershell
+# Bước 1: Lấy tên pod ODC Server hiện tại và lưu vào biến
+$POD_NAME = kubectl get pods -n odc-system -l app=odc-server -o jsonpath="{.items[0].metadata.name}"
+
+# Bước 2: Copy file vào thư mục /tmp của pod (Lưu ý: Bọc biến trong ngoặc nhọn ${} để tránh lỗi cú pháp)
+kubectl cp ./data/sentinel2_product.yaml odc-system/${POD_NAME}:/tmp/sentinel2_product.yaml
+
+# Bước 3: Thực thi lệnh nạp product bên trong pod
+kubectl exec -it -n odc-system $POD_NAME -- datacube product add /tmp/sentinel2_product.yaml
 ```
 
-Thêm định nghĩa product từ file YAML:
+Xem danh sách product
 
-```bash
-kubectl exec -it -n odc-system $POD_NAME -- \
-  datacube product add /tmp/sentinel2_product.yaml
+```powershell
+# Bước 1: Lấy tên pod (nếu bạn đã tắt terminal và mất biến $POD_NAME)
+$POD_NAME = kubectl get pods -n odc-system -l app=odc-server -o jsonpath="{.items[0].metadata.name}"
+
+# Bước 2: Chạy lệnh xem danh sách
+kubectl exec -it -n odc-system $POD_NAME -- datacube product list
 ```
 
-### 2. Nạp Dataset
-
-Nạp dữ liệu EO3:
+### 2. Khởi tạo ODC Explorer
 
 ```bash
-kubectl exec -it -n odc-system deployment/odc-server -- \
-  datacube dataset add /data/dataset.yaml
+kubectl exec -it -n odc-system deployment/odc-explorer -- cubedash-gen -v --init
 ```
 
-### 3. Khởi tạo ODC Explorer
-
-```bash
-kubectl exec -it -n odc-system deployment/odc-server -- \
-  cubedash-gen -v --init
-```
-
-### 4. Cập nhật Explorer
+### 3. Cập nhật Explorer
 
 Sau khi index dataset:
 
 ```bash
-kubectl exec -it -n odc-system deployment/odc-server -- \
-  cubedash-gen --all
+kubectl exec -it -n odc-system deployment/odc-explorer -- cubedash-gen --all    
 ```
 
 ---

@@ -13,3 +13,6 @@ secretGenerator:
   - name: odc-secrets
     envs:
       - .env
+      
+generatorOptions:
+  disableNameSuffixHash: true
