@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jupyterhub-hub-sa
+  namespace: odc-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jupyterhub-hub-role
+  namespace: odc-system
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "persistentvolumeclaims", "services", "events"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jupyterhub-hub-rb
+  namespace: odc-system
+subjects:
+  - kind: ServiceAccount
+    name: jupyterhub-hub-sa
+    namespace: odc-system
+roleRef:
+  kind: Role
+  name: jupyterhub-hub-role
+  apiGroup: rbac.authorization.k8s.io

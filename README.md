@@ -1,89 +1,58 @@
-# README - Hướng dẫn triển khai ODC Explorer với Docker Compose
+# README - Hướng dẫn Triển khai ODC Server với Kubernetes (Kustomize)
 
 ## Giới thiệu
 
-Tài liệu này hướng dẫn cách khởi tạo và vận hành hệ thống **ODC Explorer** bằng Docker Compose, bao gồm:
+Tài liệu này hướng dẫn cách triển khai hệ thống **ODC Server** trên **Kubernetes** sử dụng **Kustomize** để quản lý cấu hình. Hệ thống bao gồm:
 
-- Tải source code Datacube Explorer từ GitHub
-- Build Docker image
-- Khởi động / dừng container
-- Khởi tạo giao diện Explorer
-- Index dữ liệu viễn thám
-- Nạp Dataset EO3
-- Cập nhật dữ liệu hiển thị trên Web Explorer
+- **PostgreSQL**: Cơ sở dữ liệu chính
+- **MinIO**: Dịch vụ lưu trữ object (S3 compatible)
+- **ODC Server**: Máy chủ Datacube
+- **JupyterHub**: Môi trường notebook tương tác
+- **ODC Explorer**: Giao diện web để khám phá dữ liệu
+- **Ingress**: Điều hướng traffic và expose service
 
----
+### Tổng quan Kiến trúc (Architecture Overview)
 
-# 1. Tải Datacube Explorer từ GitHub
+Hệ thống hoạt động dựa trên sự tương tác chặt chẽ giữa các thành phần:
 
-Clone source code từ GitHub:
-
-```bash
-git clone https://github.com/opendatacube/datacube-explorer.git
-```
-
-# 2. Build Docker Images
-
-Lệnh dưới đây sẽ build toàn bộ Docker image được định nghĩa trong `docker-compose.yml`.
-
-```bash
-docker compose build
-```
+- **JupyterHub** cung cấp môi trường lập trình trực tuyến cho người dùng.
+- Các notebook từ JupyterHub sẽ gọi API đến **ODC Server** để xử lý dữ liệu.
+- **ODC Server** đóng vai trò trung tâm, truy vấn thông tin metadata (vị trí, thời gian) từ **PostgreSQL** và tải trực tiếp dữ liệu ảnh viễn thám gốc (GeoTIFF, NetCDF) từ **MinIO**.
+- Tất cả các dịch vụ giao tiếp với bên ngoài đều được điều hướng qua **NGINX Ingress**.
 
 ---
 
-# 3. Kustomize - Triển khai Kubernetes
+## Yêu cầu Tiên quyết (Prerequisites)
 
-Dự án đã được tổ chức thành cấu trúc `base` và overlay `dev`:
+### 1. Kubernetes Cluster
 
-- `kustomize/base`: manifest chung (bao gồm Namespace, Secrets, Services, Deployments, Jobs, Ingress)
-- `kustomize/overlays/dev`: cấu hình dev
+- Kubernetes v1.20 trở lên
+- `kubectl` CLI được cấu hình để truy cập cluster
+- Kiểm tra kết nối:
+  ```bash
+  kubectl cluster-info
+  kubectl get nodes
+  ```
 
-Áp dụng overlay dev bằng lệnh:
+### 2. NGINX Ingress Controller
 
-```bash
-kubectl apply -k .
-```
-
-Hoặc chạy trực tiếp overlay dev:
-
-```bash
-kubectl apply -k kustomize/overlays/dev
-```
-
-Tạo namespace bằng file YAML:
-
-```bash
-kubectl apply -f kustomize/base/namespace.yaml
-```
-
-Hoặc để Kustomize tự tạo namespace khi apply toàn bộ dev overlay:
-
-```bash
-kubectl apply -k kustomize/overlays/dev
-```
-
-Xem manifest dev:
-
-```bash
-kubectl kustomize kustomize/overlays/dev
-```
-
-## Ingress
-
-Dự án bao gồm Ingress để expose các service qua hostname:
-
-- **explorer.odc-server.local**: Datacube Explorer (port 8000)
-- **jupyter.odc-server.local**: Jupyter Notebook (port 8888)
-- **minio.odc-server.local**: MinIO Dashboard (port 9001)
-
-Yêu cầu NGINX Ingress Controller. Để cài đặt:
+Cài đặt NGINX Ingress Controller để expose các service:
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
 ```
 
-Sau đó cập nhật file hosts để resolve hostname:
+Xác nhận cài đặt:
+
+```bash
+kubectl get pods -n ingress-nginx
+```
+
+### 3. Cấu hình Local Hosts
+
+Để truy cập các service qua hostname, thêm các dòng sau vào file **hosts**:
+
+**Windows** (`C:\Windows\System32\drivers\etc\hosts`):
 
 ```
 127.0.0.1 explorer.odc-server.local
@@ -91,125 +60,271 @@ Sau đó cập nhật file hosts để resolve hostname:
 127.0.0.1 minio.odc-server.local
 ```
 
----
+**Linux/macOS** (`/etc/hosts`):
 
-# 4. Khởi động Containers
-
-Khởi chạy toàn bộ container ở chế độ nền (`detached mode`).
-
-```bash
-docker compose up -d
+```
+127.0.0.1 explorer.odc-server.local
+127.0.0.1 jupyter.odc-server.local
+127.0.0.1 minio.odc-server.local
 ```
 
-Kiểm tra trạng thái container:
-
-```bash
-docker compose ps
-```
+> Nếu dùng cluster remote, thay `127.0.0.1` bằng IP của cluster hoặc load balancer.
 
 ---
 
-# 4. Dừng và gỡ Containers
+## Cấu trúc Dự án
 
-Dừng và xoá toàn bộ container.
-
-```bash
-docker compose down
+```
+kustomize/
+├── base/                           # Base manifests (dùng cho tất cả môi trường)
+│   ├── namespace.yaml              # Tạo namespace 'odc-system'
+│   ├── 01-postgres-core.yaml       # PostgreSQL StatefulSet & PVC
+│   ├── 02-minio-storage.yaml       # MinIO Deployment & Service
+│   ├── 03-odc-server.yaml          # ODC Server Deployment
+│   ├── 04-jupyter-rbac.yaml        # RBAC cho Jupyter
+│   ├── 05-jupyter-hub.yaml         # JupyterHub Deployment
+│   ├── 06-jupyter-proxy.yaml       # Jupyter Proxy Service
+│   ├── 07-ingress.yaml             # Ingress rules
+│   ├── 08-odc-explorer.yaml        # ODC Explorer Deployment
+│   ├── jupyterhub_config.py        # Cấu hình JupyterHub
+│   └── kustomization.yaml          # Danh sách resources
+└── overlays/
+    └── dev/                        # Cấu hình cho môi trường dev
+        ├── kustomization.yaml      # Patches & customizations
+        └── .env                    # Biến môi trường
 ```
 
-> Không cần thêm `-d` cho lệnh `down`.
+### Base Resources
+
+- **namespace.yaml**: Tạo namespace `odc-system` để cô lập resources
+- **PostgreSQL**: Database lưu trữ metadata, được bảo vệ bằng PersistentVolumeClaim
+- **MinIO**: Object storage tương thích S3 cho dữ liệu viễn thám
+- **ODC Server**: API server chính
+- **JupyterHub**: Cung cấp Jupyter notebooks cho users
+- **ODC Explorer**: Giao diện web để khám phá dữ liệu
+- **Ingress**: Expose services qua HTTP/HTTPS
 
 ---
 
-# 5. Khởi tạo giao diện ODC Explorer
+## Triển khai (Deployment)
 
-## Cách khuyến nghị: dùng profile
+### 1. Xem Manifest (Preview)
+
+Trước khi áp dụng, kiểm tra các resource sẽ được tạo:
 
 ```bash
-docker compose --profile setup up --force-recreate explorer-init
+kubectl kustomize kustomize/overlays/dev
 ```
 
-Lệnh này sẽ:
+### 2. Triển khai sang Cluster
 
-- Khởi tạo database Explorer
-- Chuẩn bị metadata cần thiết
-- Tạo cấu hình ban đầu cho giao diện Explorer
-
----
-
-## Chạy trực tiếp
+Áp dụng toàn bộ cấu hình:
 
 ```bash
-docker compose run --rm explorer cubedash-gen -v --init
+kubectl apply -k kustomize/overlays/dev
 ```
 
----
+### 3. Kiểm tra Trạng thái
 
-# 6. Nạp Product vào Datacube (Indexing)
-
-Thêm định nghĩa product từ file YAML.
+Xem toàn bộ resource trong namespace `odc-system`:
 
 ```bash
-docker compose exec odc-server datacube product add /data/product.yaml
+# Liệt kê tất cả pods
+kubectl get pods -n odc-system
+
+# Xem pods chi tiết
+kubectl get pods -n odc-system -o wide
+
+# Theo dõi pods (live monitoring)
+kubectl get pods -n odc-system -w
 ```
 
----
-
-# 7. Nạp Dataset EO3
-
-Nạp dữ liệu không gian thực tế theo chuẩn EO3.
+### 4. Xem Log của Pods
 
 ```bash
-docker compose exec odc-server datacube dataset add /data/dataset.yaml
-```
+# Log của ODC Server
+kubectl logs -n odc-system -l app=odc-server -f
 
----
+# Log của PostgreSQL
+kubectl logs -n odc-system -l app=postgres -f
 
-# 8. Cập nhật dữ liệu lên Web Explorer
+# Log của MinIO
+kubectl logs -n odc-system -l app=minio -f
 
-Sau khi index dataset, cần cập nhật lại Explorer để dữ liệu hiển thị trên giao diện web.
-
-## Cách khuyến nghị: dùng profile
-
-```bash
-docker compose --profile tools up --force-recreate explorer-index
+# Log của JupyterHub
+kubectl logs -n odc-system -l app=jupyterhub -f
 ```
 
 ---
 
-## Chạy trực tiếp
+## Truy cập Dịch vụ
+
+Sau khi triển khai thành công, các dịch vụ sẽ có sẵn tại:
+
+| Dịch vụ           | URL                              | Chức năng                      |
+| ----------------- | -------------------------------- | ------------------------------ |
+| **ODC Explorer**  | http://explorer.odc-server.local | Giao diện web khám phá dữ liệu |
+| **JupyterHub**    | http://jupyter.odc-server.local  | Notebooks tương tác            |
+| **MinIO Console** | http://minio.odc-server.local    | Quản lý object storage         |
+
+### Tìm địa chỉ IP (Nếu chưa cấu hình hosts)
 
 ```bash
-docker compose run --rm explorer cubedash-gen --all
+kubectl get ingress -n odc-system -o wide
 ```
 
 ---
 
-# Quy trình đầy đủ
+## Cấu hình (Configuration)
 
-Thứ tự chạy đề xuất:
+### File `.env` (Biến môi trường)
+
+Cập nhật file [kustomize/overlays/dev/.env](kustomize/overlays/dev/.env) để tùy chỉnh cấu hình:
 
 ```bash
-# Clone source code
-git clone https://github.com/opendatacube/datacube-explorer.git
+# Database
+POSTGRES_PASSWORD=your_secure_password
+POSTGRES_DB=odc
 
-# Build images
-docker compose build
+# MinIO
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin
+MINIO_REGION=us-east-1
 
-# Khởi động hệ thống
-docker compose up -d
+# ODC Server
+ODC_ENVIRONMENT=dev
+LOG_LEVEL=INFO
+```
 
-# Khởi tạo explorer
-docker compose --profile setup up --force-recreate explorer-init
+### Cập nhật Cấu hình
 
-# Nạp product
-docker compose exec odc-server datacube product add /data/product.yaml
+Sau khi chỉnh sửa `.env`, áp dụng lại:
 
-# Nạp dataset
-docker compose exec odc-server datacube dataset add /data/dataset.yaml
-
-# Cập nhật explorer
-docker compose --profile tools up --force-recreate explorer-index
+```bash
+kubectl apply -k kustomize/overlays/dev
 ```
 
 ---
+
+## Quản lý Dữ liệu
+
+### 1. Nạp Product (Indexing)
+
+Trước khi nạp Product, bạn cần chuyển file định nghĩa (YAML) từ máy tính local vào bên trong Pod của ODC Server.
+
+**Bước 1:** Copy file từ local vào thư mục `/tmp` của Pod:
+
+```bash
+# Lấy tên pod ODC Server hiện tại
+POD_NAME=$(kubectl get pods -n odc-system -l app=odc-server -o jsonpath='{.items[0].metadata.name}')
+
+# Copy file vào pod
+kubectl cp ./sentinel2_product.yaml odc-system/$POD_NAME:/tmp/sentinel2_product.yaml
+```
+
+Thêm định nghĩa product từ file YAML:
+
+```bash
+kubectl exec -it -n odc-system $POD_NAME -- \
+  datacube product add /tmp/sentinel2_product.yaml
+```
+
+### 2. Nạp Dataset
+
+Nạp dữ liệu EO3:
+
+```bash
+kubectl exec -it -n odc-system deployment/odc-server -- \
+  datacube dataset add /data/dataset.yaml
+```
+
+### 3. Khởi tạo ODC Explorer
+
+```bash
+kubectl exec -it -n odc-system deployment/odc-server -- \
+  cubedash-gen -v --init
+```
+
+### 4. Cập nhật Explorer
+
+Sau khi index dataset:
+
+```bash
+kubectl exec -it -n odc-system deployment/odc-server -- \
+  cubedash-gen --all
+```
+
+---
+
+## Scaling & Customization
+
+### Tăng Replicas
+
+Để tăng số lượng pods của một deployment:
+
+```bash
+# Tăng ODC Server replicas
+kubectl scale deployment/odc-server -n odc-system --replicas=3
+
+# Tăng JupyterHub replicas
+kubectl scale deployment/jupyterhub -n odc-system --replicas=2
+```
+
+### Tùy chỉnh qua Kustomize
+
+Chỉnh sửa [kustomize/overlays/dev/kustomization.yaml](kustomize/overlays/dev/kustomization.yaml) để:
+
+- Patch resources
+- Thay đổi image versions
+- Cập nhật ConfigMap/Secrets
+- Thêm annotations, labels
+
+---
+
+## Xoá Triển khai
+
+Để xoá toàn bộ resources khỏi cluster:
+
+```bash
+kubectl delete -k kustomize/overlays/dev
+```
+
+> **Cảnh báo**: Lệnh này sẽ xoá tất cả data. Hãy backup trước khi xoá.
+
+---
+
+## Troubleshooting
+
+### Pods không khởi động
+
+```bash
+# Xem mô tả pods để tìm lỗi
+kubectl describe pod -n odc-system <pod-name>
+
+# Xem event của namespace
+kubectl get events -n odc-system --sort-by='.lastTimestamp'
+```
+
+### Service không thể truy cập
+
+```bash
+# Kiểm tra Service
+kubectl get svc -n odc-system
+
+# Kiểm tra Ingress
+kubectl get ingress -n odc-system
+
+# Kiểm tra DNS
+kubectl exec -it -n odc-system <pod-name> -- nslookup explorer.odc-server.local
+```
+
+### PersistentVolume không available
+
+```bash
+# Xem PV và PVC
+kubectl get pv
+kubectl get pvc -n odc-system
+
+# Xem chi tiết PVC
+kubectl describe pvc -n odc-system
+```

@@ -16,9 +16,9 @@ spec:
               service:
                 name: odc-explorer-svc
                 port:
-                  number: 8000
+                  number: 8080
 
-    # 2. Jupyter Notebook
+    # 2. Jupyter hub
     - host: jupyter.odc-server.local
       http:
         paths:
@@ -26,9 +26,9 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: jupyter-svc
+                name: jupyterhub-proxy-public-svc
                 port:
-                  number: 8888
+                  number: 8000
 
     # 3. MinIO Dashboard
     - host: minio.odc-server.local

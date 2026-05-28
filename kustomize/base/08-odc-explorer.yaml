@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: odc-explorer
+  namespace: odc-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: odc-explorer
+  template:
+    metadata:
+      labels:
+        app: odc-explorer
+    spec:
+      containers:
+        - name: explorer
+          image: opendatacube/explorer:latest
+          ports:
+            - containerPort: 8080
+
+          env:
+            # --- 1. NHẶT CÁC BIẾN NHẠY CẢM TỪ SECRET ---
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: DB_PASSWORD
+            - name: MINIO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: MINIO_USER
+            - name: MINIO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: MINIO_PASSWORD
+
+            # --- 2. CẤU HÌNH DATABASE CỦA BẠN (Đã nối chuỗi thành công) ---
+            - name: DB_HOSTNAME
+              value: "postgres-svc"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_DATABASE
+              value: "opendatacube"
+            - name: DATACUBE_DB_URL
+              # Bây giờ biến này mới nhận được giá trị thực của tài khoản DB
+              value: "postgresql://$(DB_USER):$(DB_PASSWORD)@postgres-svc:5432/opendatacube"
+            - name: ODC_DEFAULT_INDEX_DRIVER
+              value: "postgis"
+            - name: DATACUBE_INDEX_DRIVER
+              value: "postgis"
+
+            # --- 3. CẤU HÌNH MINIO CỦA BẠN ---
+            - name: AWS_ACCESS_KEY_ID
+              value: "$(MINIO_USER)"
+            - name: AWS_SECRET_ACCESS_KEY
+              value: "$(MINIO_PASSWORD)"
+            - name: AWS_S3_ENDPOINT
+              value: "minio-svc:9000"
+            - name: AWS_DEFAULT_REGION
+              value: "local"
+            - name: AWS_HTTPS
+              value: "NO"
+            - name: AWS_VIRTUAL_HOSTING
+              value: "FALSE"
+            - name: GDAL_HTTP_UNSAFESSL
+              value: "YES"
+
+            # --- 4. TÙY CHỈNH GIAO DIỆN CỦA BẠN ---
+            - name: CUBEDASH_DEFAULT_TIMEZONE
+              value: "Asia/Ho_Chi_Minh"
+            - name: CUBEDASH_INSTANCE_TITLE
+              value: "Local ODC Explorer"
+            - name: CUBEDASH_THEME
+              value: "odc"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: odc-explorer-svc
+  namespace: odc-system
+spec:
+  selector:
+    app: odc-explorer
+  ports:
+    - name: web
+      port: 8080
+      targetPort: 8080

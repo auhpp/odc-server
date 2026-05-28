@@ -7,13 +7,9 @@ images:
   - name: aub2205926/my-custom-odc
     newTag: "1.9.18"
   - name: aub2205926/my-custom-jupyter
-    newTag: "1.0"
-patches:
-  - target:
-      kind: Service
-      name: jupyter-svc
-    path: jupyter-service-patch.yaml
-  - target:
-      kind: Service
-      name: minio-svc
-    path: minio-service-patch.yaml
+    newTag: "1.1"
+
+secretGenerator:
+  - name: odc-secrets
+    envs:
+      - .env

@@ -3,9 +3,16 @@ kind: Kustomization
 namespace: odc-system
 resources:
   - namespace.yaml
-  - 01-secrets.yaml
-  - 02-postgres-core.yaml
-  - 03-minio-storage.yaml
-  - 04-odc-server.yaml
-  - 05-jupyter.yaml
-  - 06-ingress.yaml
+  - 01-postgres-core.yaml
+  - 02-minio-storage.yaml
+  - 03-odc-server.yaml
+  - 04-jupyter-rbac.yaml
+  - 05-jupyter-hub.yaml
+  - 06-jupyter-proxy.yaml
+  - 07-ingress.yaml
+  - 08-odc-explorer.yaml
+
+configMapGenerator:
+  - name: jupyterhub-config
+    files:
+      - jupyterhub_config.py

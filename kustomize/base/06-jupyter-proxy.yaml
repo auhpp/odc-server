@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jupyterhub-proxy
+  namespace: odc-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: proxy
+  template:
+    metadata:
+      labels:
+        component: proxy
+    spec:
+      containers:
+        - name: proxy
+          image: jupyterhub/configurable-http-proxy:4.6.1
+          command:
+            - configurable-http-proxy
+            - --ip=0.0.0.0
+            - --api-ip=0.0.0.0
+            - --api-port=8001
+            - --default-target=http://jupyterhub-hub-svc:8081
+            - --error-target=http://jupyterhub-hub-svc:8081
+          ports:
+            - containerPort: 8000
+              name: public
+            - containerPort: 8001
+              name: api
+          env:
+            - name: CONFIGPROXY_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: odc-secrets
+                  key: CONFIGPROXY_AUTH_TOKEN
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jupyterhub-proxy-public-svc
+  namespace: odc-system
+spec:
+  selector:
+    component: proxy
+  ports:
+    - name: public
+      port: 8000
+      targetPort: 8000
+    - name: api
+      port: 8001
+      targetPort: 8001
